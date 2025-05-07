@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class Screen extends Container {
     private static final long serialVersionUID = 0x4141414141414141L;
 
-    private final Font FONT = new Font(null, Font.PLAIN, 15);
+    private final Font FONT = new Font(null, Font.PLAIN, 20);
 
     private final ArrayList messages = new ArrayList();
 
