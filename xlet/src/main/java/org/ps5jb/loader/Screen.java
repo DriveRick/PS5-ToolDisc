@@ -10,7 +10,6 @@ import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Encapsulates the capabilities of the screen.
@@ -19,70 +18,37 @@ public class Screen extends Container {
     private static final long serialVersionUID = 0x4141414141414141L;
 
     private final Font FONT = new Font(null, Font.PLAIN, 20);
-
     private final ArrayList messages = new ArrayList();
-
     private static final Screen instance = new Screen();
 
-    private AtomicBoolean isPainting = new AtomicBoolean(false);
+    // AtomicBoolean entfernt – unter Java 1.3/1.4 nicht verfügbar
+    private boolean isPainting = false;
+    private boolean isDirty    = false;
 
-    private AtomicBoolean isDirty = new AtomicBoolean(false);
-
-    /**
-     * Default constructor. Declared as private since this class is singleton.
-     */
     private Screen() {
         super();
     }
 
-    /**
-     * Retrieves the singleton instance of the screen.
-     *
-     * @return {@code Screen} instance, there is only one in the application.
-     */
     public static Screen getInstance() {
         return instance;
     }
 
-    /**
-     * Adds a message on the singleton screen instance, immediately repainting it.
-     * Equivalent to {@link #println(String, boolean, boolean)} with {@code repaint} parameter equal to {@code true}
-     * and {@code replaceLast} parameter equal to {@code false}.
-     *
-     * @param msg Message to add.
-     */
     public static void println(String msg) {
         println(msg, true, false);
     }
 
-    /**
-     * Adds a message on the singleton screen instance, with control on whether to immediately repaint it or not.
-     *
-     * @param msg Message to add.
-     * @param repaint Whether to repaint the screen right away or not.
-     * @param replaceLast Whether to add a new line or replace the last printed line (useful for progress output).
-     */
     public static void println(String msg, boolean repaint, boolean replaceLast) {
         getInstance().print(msg, repaint, replaceLast);
     }
 
-    /**
-     * Adds a message to this screen instance.
-     *
-     * @param msg Message to add.
-     * @param repaint Whether to repaint the screen right away or not.
-     * @param replaceLast Whether to add a new line or replace the last printed line (useful for progress output).
-     */
     public void print(String msg, boolean repaint, boolean replaceLast) {
         synchronized (this) {
             if (replaceLast && messages.size() > 0) {
                 messages.remove(messages.size() - 1);
             }
             messages.add(msg);
-            if (messages.size() > 48) {
-                messages.remove(0);
-            }
-            isDirty.set(true);
+            // feste 48-Begrenzung entfernt
+            isDirty = true;
         }
 
         if (repaint) {
@@ -90,14 +56,9 @@ public class Screen extends Container {
         }
     }
 
-    /**
-     * Prints the exception's stack trace on this screen instance.
-     *
-     * @param e Exception whose stack trace to print.
-     */
     public void printStackTrace(Throwable e) {
         StringTokenizer st;
-        StringBuffer sb;
+        StringBuffer   sb;
 
         try {
             StringWriter sw = new StringWriter();
@@ -108,7 +69,6 @@ public class Screen extends Container {
                 } finally {
                     pw.close();
                 }
-
                 String stackTrace = sw.toString();
                 st = new StringTokenizer(stackTrace, "\n", false);
                 sb = new StringBuffer(stackTrace.length());
@@ -122,6 +82,7 @@ public class Screen extends Container {
                     sb.setLength(0);
                     for (int i = 0; i < line.length(); ++i) {
                         char c = line.charAt(i);
+                        // keine Character.valueOf-Calls hier!
                         if (c == '\t') {
                             sb.append("   ");
                         } else {
@@ -133,50 +94,49 @@ public class Screen extends Container {
             }
         } catch (IOException ioEx) {
             printThrowable(e);
-
-            throw new RuntimeException("Another exception occurred while printing stacktrace. " + ioEx.getClass().getName() + ": " + ioEx.getMessage());
+            throw new RuntimeException("Another exception occurred while printing stacktrace. "
+                    + ioEx.getClass().getName() + ": " + ioEx.getMessage());
         }
     }
 
-    /**
-     * Convenience method to print basic information about an exception, without printing all the stack trace.
-     *
-     * @param e Exception to print.
-     */
     public void printThrowable(Throwable e) {
         print(e.getClass().getName() + ": " + e.getMessage(), true, false);
     }
 
-    /**
-     * Repaint the screen.
-     *
-     * @param g {@code} Graphics code on which the screen data is painted.
-     */
     @Override
     public void paint(Graphics g) {
         List messagesCopy;
         synchronized (this) {
-            if (isPainting.get() || !isDirty.get()) return;
-            isPainting.set(true);
-            isDirty.set(false);
-
+            if (isPainting || !isDirty) return;
+            isPainting = true;
+            isDirty    = false;
             messagesCopy = new ArrayList(messages);
         }
 
         g.setFont(FONT);
         g.setColor(Color.white);
-
         g.clearRect(0, 0, getWidth(), getHeight());
 
-        int x = 80;
-        int y = 80;
-        int height = g.getFontMetrics().getHeight();
-        for (int i = 0; i < messagesCopy.size(); i++) {
+        // dynamische Zeilen-Anzeige:
+        int topMargin    = 20;
+        int bottomMargin = 20;
+        int leftMargin   = 10;
+
+        int lineHeight   = g.getFontMetrics().getHeight();
+        int usableHeight = getHeight() - topMargin - bottomMargin;
+        int maxLines     = usableHeight / lineHeight;
+
+        int startIndex = Math.max(0, messagesCopy.size() - maxLines);
+
+        int x = leftMargin;
+        int y = topMargin + g.getFontMetrics().getAscent();
+
+        for (int i = startIndex; i < messagesCopy.size(); i++) {
             String msg = (String) messagesCopy.get(i);
             g.drawString(msg, x, y);
-            y += height;
+            y += lineHeight;
         }
 
-        isPainting.set(false);
+        isPainting = false;
     }
 }
