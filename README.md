@@ -1,7 +1,7 @@
 newly added:
 
 USB bin/elf loader extended to read and execute *.jar files
-For this to work you have to start jailbreak.jar from DISC so that USB is mounted, otherwise it cannot read anything from USB.
+For this to work you have to start umtx1 or umtx2 and jailbreak.jar from DISC so that USB is mounted, otherwise it cannot read anything from USB.
 
 best way would be:
 umtx1(or2)-jailbreak-elfldr start from DISC, then from USB.
